@@ -1,0 +1,18 @@
+# STM32/CMake build output
+build/
+Debug/
+Release/
+
+# Compiled firmware / object files
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.su
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
