@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/cmake_install.cmake",
+		"C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/cmake/stm32cubemx/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

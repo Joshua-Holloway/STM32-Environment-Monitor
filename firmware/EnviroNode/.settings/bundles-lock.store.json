@@ -7,7 +7,7 @@
       "selected_by": [
         {
           "name": "cmake",
-          "version": "4.4.0+st.1"
+          "version": "^4.4.0+st.1"
         }
       ]
     },
@@ -18,7 +18,7 @@
       "selected_by": [
         {
           "name": "cmake",
-          "version": "4.4.0+st.1"
+          "version": "^4.4.0+st.1"
         }
       ]
     },
@@ -29,7 +29,7 @@
       "selected_by": [
         {
           "name": "cmake",
-          "version": "4.4.0+st.1"
+          "version": "^4.4.0+st.1"
         }
       ]
     },
@@ -40,7 +40,7 @@
       "selected_by": [
         {
           "name": "gnu-tools-for-stm32",
-          "version": "14.3.1+st.2"
+          "version": "^14.3.1+st.2"
         }
       ]
     },
@@ -51,7 +51,7 @@
       "selected_by": [
         {
           "name": "gnu-tools-for-stm32",
-          "version": "14.3.1+st.2"
+          "version": "^14.3.1+st.2"
         }
       ]
     },
@@ -62,7 +62,7 @@
       "selected_by": [
         {
           "name": "gnu-tools-for-stm32",
-          "version": "14.3.1+st.2"
+          "version": "^14.3.1+st.2"
         }
       ]
     },
@@ -73,7 +73,7 @@
       "selected_by": [
         {
           "name": "gnu-tools-for-stm32",
-          "version": "14.3.1+st.2"
+          "version": "^14.3.1+st.2"
         }
       ]
     },
@@ -95,7 +95,7 @@
       "selected_by": [
         {
           "name": "ninja",
-          "version": "1.13.2+st.1"
+          "version": "^1.13.2+st.1"
         }
       ]
     },
@@ -106,7 +106,7 @@
       "selected_by": [
         {
           "name": "ninja",
-          "version": "1.13.2+st.1"
+          "version": "^1.13.2+st.1"
         }
       ]
     },
@@ -117,7 +117,7 @@
       "selected_by": [
         {
           "name": "ninja",
-          "version": "1.13.2+st.1"
+          "version": "^1.13.2+st.1"
         }
       ]
     },
@@ -128,7 +128,7 @@
       "selected_by": [
         {
           "name": "st-arm-clangd",
-          "version": "21.1.0+st.2"
+          "version": "^21.1.0+st.2"
         }
       ]
     },
@@ -139,7 +139,7 @@
       "selected_by": [
         {
           "name": "st-arm-clangd",
-          "version": "21.1.0+st.2"
+          "version": "^21.1.0+st.2"
         }
       ]
     },
@@ -150,7 +150,7 @@
       "selected_by": [
         {
           "name": "st-arm-clangd",
-          "version": "21.1.0+st.2"
+          "version": "^21.1.0+st.2"
         }
       ]
     }

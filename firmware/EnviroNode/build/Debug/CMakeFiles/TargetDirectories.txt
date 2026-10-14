@@ -1,0 +1,6 @@
+C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/CMakeFiles/EnviroNode.dir
+C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/CMakeFiles/edit_cache.dir
+C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/CMakeFiles/rebuild_cache.dir
+C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir
+C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/cmake/stm32cubemx/CMakeFiles/edit_cache.dir
+C:/Users/FiercePC/Desktop/Code/stm32-environment-monitor/firmware/EnviroNode/build/Debug/cmake/stm32cubemx/CMakeFiles/rebuild_cache.dir

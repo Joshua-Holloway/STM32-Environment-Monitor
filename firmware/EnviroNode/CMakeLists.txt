@@ -1,64 +1,68 @@
-# Set the minimum version of CMake that can be used
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.22)
+
+#
+# This file is generated only once,
+# and is not re-generated if converter is called multiple times.
+#
+# User is free to modify the file as much as necessary
+#
+
+# Setup compiler settings
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
+
+
+# Define the build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+
+# Set the project name
+set(CMAKE_PROJECT_NAME EnviroNode)
 
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
-set(CMAKE_C_COMPILER_FORCED TRUE)
-set(CMAKE_CXX_COMPILER_FORCED TRUE)
 
-# Set target definition variables required by the toolchain file
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/target.cmake)
+# Core project settings
+project(${CMAKE_PROJECT_NAME})
+message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# Set the toolchain file for cross-compilation
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/gcc-arm-none-eabi.cmake)
-
-# Project definition
-project(EnviroNode)
-
-# Enable CMake support for ASM and C/CPP languages
-enable_language(C CXX ASM)
-
-set(PROJECT_NAME EnviroNode)
+# Enable CMake support for ASM and C languages
+enable_language(C ASM)
 
 # Create an executable object type
-add_executable(${PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME})
 
-# Include additional CMake files for flags, components, and files
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/flags.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/components.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/files.cmake)
+# Add STM32CubeMX generated sources
+add_subdirectory(cmake/stm32cubemx)
 
-# Add sources to executable/library
-target_sources(${PROJECT_NAME} PRIVATE
-  # User defined sources
+# Link directories setup
+target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined library search paths
 )
 
-# Add include directories
-target_include_directories(${PROJECT_NAME} PRIVATE
-  # User defined include directories
+# Add sources to executable
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user sources here
 )
 
-# Compiler options
-target_compile_options(${PROJECT_NAME} PRIVATE
-  # User defined compiler options
+# Add include paths
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined include paths
 )
 
-# Add additional defined symbols
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-  # Add additional defined symbols here
+# Add project symbols (macros)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined symbols
 )
 
-# Linker options
-target_link_options(${PROJECT_NAME} PRIVATE 
-  # User defined linker options
-)
+# Remove wrong libob.a library dependency when using cpp files
+list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
-# Add additional linker search directories
-target_link_directories(${PROJECT_NAME} PRIVATE
-  # Add additional linker search directories here
-)
+# Add linked libraries
+target_link_libraries(${CMAKE_PROJECT_NAME}
+    stm32cubemx
 
-# Add additional linker libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE
-  # Add additional linker libraries here
+    # Add user defined libraries
 )
