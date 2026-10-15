@@ -2,50 +2,70 @@
 
 EnviroNode is an embedded environmental monitoring system built around the **STM32 NUCLEO-F401RE** development board.
 
-The project was created to develop practical experience with embedded C, microcontrollers, hardware/software integration, debugging, digital communication protocols, interrupts, timers, and real-world sensor integration.
+I built the project to gain practical experience with embedded C, microcontrollers, hardware/software integration, interrupts, digital communication protocols, debugging and real-world sensor input.
 
-The system monitors environmental conditions, displays readings locally, accepts user input, provides audible alerts, and exposes diagnostic information over UART.
+The current version reads temperature and humidity from a DHT22 sensor, displays the values on an SSD1306 OLED, allows the user to switch display modes with a physical interrupt-driven button, and exposes live diagnostic output over UART.
 
 ---
 
 ## Features
 
-- Temperature and humidity monitoring
-- Local OLED display
-- User-configurable alert thresholds
-- Passive buzzer for warning tones
-- Physical push-button input
-- GPIO interrupt handling
-- Timer/PWM-based buzzer control
-- UART diagnostic output
-- I²C peripheral communication
-- Sensor error detection
-- State-based application logic
-- Hardware debugging using ST-LINK
-- CMake-based build system
-- Reproducible STM32 toolchain configuration
+- Temperature and humidity monitoring using a DHT22
+- Custom DHT22 communication code with microsecond timing
+- DHT22 checksum validation and failed-read handling
+- 0.96" 128×64 SSD1306 OLED display over I²C
+- Custom SSD1306 framebuffer and 5×7 text rendering
+- Three display modes:
+  - temperature and humidity
+  - temperature only
+  - humidity only
+- External push button using a GPIO interrupt
+- Software debounce for the external button
+- Onboard Nucleo user button support
+- Onboard LD2 LED control
+- UART diagnostic output through the ST-LINK virtual COM port
+- I²C device detection and debugging
+- Hardware flashing and debugging through onboard ST-LINK
+- CMake/Ninja-based embedded build system
+- PowerShell scripts for one-command build/flash and serial monitoring
 
 ---
 
 ## Hardware
 
-The project uses:
+The current build uses:
 
 - **STM32 NUCLEO-F401RE**
-  - STM32F401RE
+  - STM32F401RE microcontroller
   - ARM Cortex-M4
-  - 84 MHz
+  - up to 84 MHz
   - 512 KB Flash
   - 96 KB SRAM
 - DHT22 temperature and humidity sensor
-- SSD1306 0.96" 128x64 OLED display
-- Passive buzzer
+- SSD1306 0.96" 128×64 OLED display
 - External tactile push button
+- 10 kΩ resistor for the DHT22 data-line pull-up
 - Breadboard
 - Jumper wires
-- Assorted resistors
 - Onboard Nucleo user button
 - Onboard Nucleo LD2 LED
+
+A passive buzzer is available for a later alert-system stage but is not part of the current firmware.
+
+---
+
+## Current Pin Configuration
+
+| Function | Nucleo / STM32 pin | Notes |
+| --- | --- | --- |
+| DHT22 data | D7 / PA8 | Bidirectional GPIO during DHT22 communication |
+| External button | D2 / PA10 | Falling-edge EXTI interrupt |
+| OLED SCL | D15 / PB8 | I2C1 clock |
+| OLED SDA | D14 / PB9 | I2C1 data |
+| Onboard user button B1 | PC13 | Falling-edge EXTI interrupt |
+| Onboard LED LD2 | PA5 | GPIO output |
+
+The DHT22 data line uses an external **10 kΩ pull-up resistor to 3.3 V**.
 
 ---
 
@@ -58,10 +78,10 @@ The project uses:
 - ARM Cortex-M4
 - GPIO
 - EXTI interrupts
-- Timers
-- PWM
-- UART
 - I²C
+- UART
+- DWT cycle counter for microsecond timing
+- Fixed-width integer types from `stdint.h`
 
 ### Development
 
@@ -71,190 +91,190 @@ The project uses:
 - ST-LINK
 - CMake
 - Ninja
-- GNU Arm Embedded Toolchain
+- GNU tools for STM32
 - Visual Studio Code
+- PowerShell
 - Git / GitHub
 
 ---
 
 ## System Overview
 
-EnviroNode continuously samples environmental conditions and processes the results on the STM32.
+EnviroNode continuously samples environmental conditions and keeps the most recent valid reading available to the display and UART debug output.
 
 ```text
-                +----------------+
-                |     DHT22      |
-                | Temp/Humidity  |
-                +-------+--------+
-                        |
-                        v
-+---------+       +-------------------+       +-------------+
-| Button  | ----> | STM32F401RE       | ----> | SSD1306 OLED|
-+---------+       |                   |       +-------------+
-                  | Environmental     |
-                  | Monitoring Logic  | ----> UART Logging
-                  |                   |
-                  |                   | ----> Buzzer
-                  +-------------------+
+                    +----------------+
+                    |     DHT22      |
+                    | Temp/Humidity  |
+                    +-------+--------+
+                            |
+                            | PA8
+                            v
++----------------+   +-------------------+   I2C1    +----------------+
+| External Button|-->| STM32F401RE       |---------->| SSD1306 OLED   |
+| D2 / PA10      |   |                   | PB8/PB9   | 128x64         |
++----------------+   | Sensor + Display  |           +----------------+
+                     | Logic             |
+                     |                   |----------> UART diagnostics
+                     +-------------------+
+                              |
+                              +----------> Onboard LD2
 ```
 
-The application evaluates incoming sensor readings against configured thresholds.
+The default OLED view shows both readings. Each press of the external button cycles through the display modes:
 
-Normal readings are displayed on the OLED.
-
-If conditions exceed the configured limits, the system enters a warning state and activates an audible alert.
+```text
+BOTH -> TEMPERATURE -> HUMIDITY -> BOTH -> ...
+```
 
 ---
 
-## GPIO and Interrupt Handling
+## DHT22 Communication
 
-Both onboard and external push buttons are supported.
+The DHT22 does not use I²C or UART. Its data is transferred over a single digital line using pulse timings measured in microseconds.
 
-Rather than continuously polling every input, external interrupts are used where appropriate.
-
-For example:
+The firmware therefore controls PA8 directly:
 
 ```text
-Button press
-    |
-    v
-GPIO edge detected
-    |
-    v
-EXTI interrupt
-    |
-    v
-IRQ handler
-    |
-    v
-HAL_GPIO_EXTI_Callback()
-    |
-    v
-Application event
+STM32 pulls DATA low
+        |
+        v
+DHT22 recognises start signal
+        |
+        v
+DHT22 sends acknowledgement
+        |
+        v
+40 timed data bits
+        |
+        v
+Humidity + Temperature + Checksum
 ```
 
-This reduced unnecessary CPU polling and provided experience with interrupt-driven embedded design.
+The pin is switched between output mode and input mode during each transaction.
 
----
+The Cortex-M4 DWT cycle counter is used to create microsecond-scale delays so the firmware can distinguish the short and long pulses used to encode binary `0` and `1` values.
 
-## Environmental Monitoring
+The sensor sends five bytes. The fifth byte is a checksum of the first four, allowing corrupted reads to be rejected instead of treated as valid data.
 
-The DHT22 provides:
+Readings are stored internally in tenths rather than floating-point values. For example:
 
-- temperature
-- relative humidity
+```text
+257 -> 25.7 C
+548 -> 54.8 % RH
+```
 
-The firmware validates sensor communication and handles failed or invalid readings instead of assuming every acquisition was successful.
-
-Sensor measurements are then passed into the application logic for:
-
-- OLED display
-- UART logging
-- threshold comparison
-- warning generation
+The DHT22 is sampled approximately once every 2.2 seconds. If an individual read fails, the firmware reports the failure over UART and keeps the last known good values on the OLED when available.
 
 ---
 
 ## OLED Display
 
-The SSD1306 display communicates with the STM32 over **I²C**.
-
-It provides a local interface showing information such as:
+The SSD1306 display communicates with the STM32 over **I²C1** using:
 
 ```text
-EnviroNode
-
-Temp:     23.4 C
-Humidity: 48.2 %
-
-Status: NORMAL
+PB8 -> SCL
+PB9 -> SDA
 ```
 
-When a configured threshold is exceeded:
+The OLED was detected on the I²C bus at address:
 
 ```text
-EnviroNode
-
-Temp:     31.7 C
-Humidity: 67.5 %
-
-WARNING
+0x3C
 ```
+
+The display driver is implemented in `ssd1306.c` rather than relying on an Arduino-style display library.
+
+It maintains a 1024-byte framebuffer in STM32 RAM:
+
+```text
+128 x 64 pixels = 8192 pixels
+8192 bits / 8 = 1024 bytes
+```
+
+Text is drawn into this framebuffer using a small custom 5×7 bitmap font. The finished framebuffer is then transferred to the SSD1306 over I²C.
+
+### Default view
+
+```text
+TEMP
+25.7 C
+
+HUMIDITY
+54.8 %
+```
+
+### Temperature-only view
+
+```text
+      TEMPERATURE
+
+        25.7 C
+```
+
+### Humidity-only view
+
+```text
+       HUMIDITY
+
+        54.8 %
+```
+
+If no valid DHT22 reading has been obtained, the OLED displays a `DHT22 / NO DATA` message instead.
 
 ---
 
-## Buzzer
+## GPIO and Interrupt Handling
 
-A passive buzzer is driven using a hardware timer and PWM.
+Both the onboard button and the external breadboard button use external interrupts.
 
-Using PWM instead of repeatedly toggling a GPIO in software allows the STM32 timer peripheral to generate the waveform independently.
+For the external button:
 
-The firmware can therefore control:
+```text
+Button press
+    |
+    v
+PA10 falling edge
+    |
+    v
+EXTI10 interrupt
+    |
+    v
+HAL_GPIO_EXTI_Callback()
+    |
+    v
+Change display mode
+    |
+    v
+Mark display as needing redraw
+```
 
-- tone frequency
-- alert duration
-- beep patterns
-- start/stop behaviour
+The interrupt handler deliberately does not perform an OLED I²C transfer itself. Instead, it changes the display state and sets a flag. The normal main loop notices that flag and performs the redraw outside the interrupt context.
 
-without continuously occupying the CPU.
+This keeps the interrupt handler short and avoids doing relatively slow peripheral communication inside an ISR.
+
+### Button debounce
+
+Mechanical switches can generate several rapid electrical transitions during a single physical press. A 200 ms debounce interval is used so one press is treated as one display-mode change.
+
+The onboard B1 button remains configured to toggle the onboard LD2 LED.
 
 ---
 
-## UART Logging
+## UART Diagnostics
 
-USART2 is used for diagnostic output during development.
+USART2 is used for diagnostic output through the Nucleo's ST-LINK virtual COM port at **115200 baud**.
 
 Example output:
 
 ```text
-[INFO] EnviroNode initialised
-[INFO] Temperature: 22.8 C
-[INFO] Humidity: 46.1 %
-[STATE] NORMAL
-
-[INFO] Temperature: 30.6 C
-[WARN] Temperature threshold exceeded
-[STATE] WARNING
+Temperature: 25.7 C | Humidity: 54.9 %
+Temperature: 25.8 C | Humidity: 54.8 %
+DHT22 read failed
+Temperature: 25.8 C | Humidity: 54.8 %
 ```
 
-UART output was useful for debugging sensor behaviour and validating application state transitions without relying solely on the OLED.
-
----
-
-## Application States
-
-The firmware uses an explicit state-based design.
-
-Example states include:
-
-```text
-STARTUP
-   |
-   v
-NORMAL
-   |
-   +-------> WARNING
-   |
-   +-------> FAULT
-```
-
-### STARTUP
-
-Initialises hardware and peripherals.
-
-### NORMAL
-
-Sensor readings are valid and within configured limits.
-
-### WARNING
-
-One or more environmental thresholds have been exceeded.
-
-### FAULT
-
-Used when the system cannot obtain valid sensor information or encounters an unrecoverable peripheral error.
-
-This approach keeps application behaviour separate from low-level peripheral handling and makes the firmware easier to extend.
+UART is not required for normal operation. Once flashed, EnviroNode runs independently and displays its readings directly on the OLED.
 
 ---
 
@@ -264,47 +284,43 @@ This approach keeps application behaviour separate from low-level peripheral han
 stm32-environment-monitor/
 |
 +-- README.md
+|
 +-- firmware/
     +-- EnviroNode/
         |
         +-- Core/
         |   +-- Inc/
+        |   |   +-- main.h
+        |   |   +-- ssd1306.h
+        |   |
         |   +-- Src/
+        |       +-- main.c
+        |       +-- ssd1306.c
         |
         +-- Drivers/
-        |
         +-- cmake/
-        |
-        +-- .settings/
-        |
         +-- CMakeLists.txt
         +-- CMakePresets.json
         +-- EnviroNode.ioc
         +-- STM32F401xx_FLASH.ld
         +-- startup_stm32f401xe.s
+        +-- run.ps1
+        +-- monitor.ps1
 ```
 
-STM32CubeMX-generated code is kept separate from application-specific logic where practical.
+`main.c` contains the application behaviour and DHT22 interface logic.
 
-Custom code is placed within CubeMX `USER CODE` regions so that hardware configuration can be regenerated safely.
+`ssd1306.c` contains the OLED driver, framebuffer and text-rendering code.
+
+`ssd1306.h` exposes the OLED functions required by the rest of the application.
+
+STM32CubeMX-generated peripheral configuration remains in the project alongside code placed in `USER CODE` sections where appropriate.
 
 ---
 
 ## Building
 
-The project uses STM32CubeCLI-managed versions of:
-
-- CMake
-- Ninja
-- GNU tools for STM32
-
-Configure the project:
-
-```powershell
-cube cmake --preset Debug
-```
-
-Build:
+From `firmware/EnviroNode`:
 
 ```powershell
 cube cmake --build --preset Debug
@@ -318,149 +334,165 @@ build/Debug/EnviroNode.elf
 
 ---
 
-## Flashing
+## Build and Flash in One Command
 
-Connect the NUCLEO-F401RE through its onboard ST-LINK USB interface.
+The project includes `run.ps1`, which:
 
-Flash and verify:
+1. builds the Debug firmware
+2. invokes STM32CubeProgrammer CLI
+3. flashes `EnviroNode.elf` over SWD
+4. resets the board
+
+Run:
 
 ```powershell
-cube programmer -c port=SWD -w build/Debug/EnviroNode.elf -v -rst
+.\run.ps1
 ```
 
-This:
+If the local PowerShell execution policy blocks scripts:
 
-1. connects using SWD
-2. programs the STM32 Flash
-3. verifies the written firmware
-4. resets the MCU
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run.ps1
+```
+
+The script currently expects STM32CubeProgrammer at:
+
+```text
+C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer\bin\STM32_Programmer_CLI.exe
+```
+
+After the firmware has been flashed, the serial monitor is not required. The board starts EnviroNode automatically whenever it is powered.
 
 ---
 
-## Debugging
+## Serial Monitor
 
-The project supports source-level debugging through the onboard ST-LINK interface.
+For UART diagnostics, run:
 
-VS Code is configured using the STM32 ST-LINK GDB server.
+```powershell
+.\monitor.ps1
+```
 
-This allows:
+The script automatically searches for the ST-LINK virtual COM port and opens it at 115200 baud, avoiding the need to manually create a PowerShell `SerialPort` object or hard-code a COM number each session.
 
-- breakpoints
-- stepping through C
-- inspecting variables
-- pausing the physical Cortex-M4
-- examining peripheral behaviour
-- tracing interrupt execution
-
-One of the first development tests involved placing a breakpoint inside a GPIO operation and observing the physical LED change while stepping through firmware.
+Press `Ctrl+C` to stop monitoring.
 
 ---
 
 ## Development Process
 
-The project was developed incrementally.
+The project was developed incrementally so that hardware and firmware problems could be isolated rather than debugged as one large system.
 
 ```text
 STM32 project setup
         |
         v
-Onboard LED
+Onboard LED output
         |
         v
-Onboard button
+Onboard button interrupt
         |
         v
-GPIO interrupts
+External breadboard button
         |
         v
-External button
+DHT22 communication
         |
         v
-Passive buzzer
+UART sensor diagnostics
         |
         v
-Hardware PWM
+I2C configuration and bus scan
         |
         v
-DHT22 sensor
+SSD1306 detection at 0x3C
         |
         v
-I²C OLED
+Custom OLED driver + framebuffer
         |
         v
-UART diagnostics
+Interrupt-driven display mode switching
         |
         v
-Integrated state machine
+Automated build / flash / serial scripts
 ```
 
-Each component was tested independently before being integrated into the complete system.
-
-This made hardware and firmware problems easier to isolate and debug.
+Several issues required debugging across both hardware and firmware, including incorrect I²C pin mapping, verifying the OLED address, configuring GPIO interrupt modes, handling DHT22 timing and validating physical breadboard connections.
 
 ---
 
 ## What I Learned
 
-The project gave me practical experience with areas that are difficult to learn through software-only projects, including:
+This project provided practical experience with areas that are difficult to reproduce in software-only work, including:
 
 - embedded C development
 - ARM Cortex-M microcontrollers
-- GPIO configuration
-- active-high and active-low logic
-- internal pull-up resistors
-- external interrupts
-- NVIC configuration
+- GPIO input and output configuration
+- exact-width integer types
+- pointers and memory addresses
+- bitwise operations
+- `static` and `volatile` in embedded C
+- active-high and active-low signals
+- external pull-up resistors
+- GPIO external interrupts
+- NVIC interrupt configuration
 - interrupt service routines
-- hardware timers
-- PWM
-- I²C
-- UART
-- sensor communication
+- button debouncing
+- microsecond timing using the Cortex-M DWT cycle counter
+- implementing a simple digital sensor protocol directly
+- checksum validation
+- I²C peripheral communication
+- I²C device addressing and bus scanning
+- UART diagnostics
+- framebuffers and bitmap text rendering
+- separating a peripheral driver into `.c` and `.h` files
 - reading microcontroller pin mappings
-- debugging real hardware through SWD
-- using datasheets and board documentation
-- separating application logic from peripheral code
-- working with generated STM32CubeMX code
-- cross-compilation
+- flashing and debugging through SWD/ST-LINK
+- working with STM32CubeMX-generated code
+- cross-compilation with the GNU Arm toolchain
 - CMake/Ninja embedded builds
+- debugging the complete path from physical wiring to firmware behaviour
 
-One particularly useful lesson was understanding the difference between software that merely compiles and software that interacts correctly with physical hardware. Debugging required checking the complete chain from firmware configuration through GPIO signals, interrupt controllers, peripheral drivers, and physical wiring.
+One of the most useful lessons was seeing how different embedded debugging is from ordinary application development: code can compile correctly while the system still fails because of pin mappings, electrical connections, timing, peripheral configuration or communication protocol behaviour.
 
 ---
 
 ## Future Improvements
 
-Possible future development includes:
+Possible next stages include:
 
-- non-blocking sensor acquisition
-- configurable thresholds through the user interface
-- multiple OLED screens
-- historical min/max measurements
-- persistent configuration in Flash
-- additional environmental sensors
+- integrate the passive buzzer
+- generate warning tones using a hardware timer and PWM
+- configurable temperature and humidity alert thresholds
+- explicit `NORMAL`, `WARNING` and `FAULT` application states
+- historical minimum and maximum readings
+- configurable values stored in Flash
 - watchdog support
-- DMA-based peripheral transfers
+- additional environmental sensors
+- non-blocking or timer-assisted DHT22 acquisition
+- DMA-based peripheral transfers where useful
 - lower-power operating modes
 - FreeRTOS task-based architecture
-- serial data logging to a host application
+- host-side data logging and visualisation
 
 ---
 
 ## Motivation
 
-I built EnviroNode to move beyond desktop and web software and gain practical experience with the software that directly controls hardware.
+I built EnviroNode to move beyond desktop and higher-level software and gain practical experience with software that directly controls physical hardware.
 
 The project gave me exposure to the complete embedded development workflow:
 
 ```text
-hardware configuration
-→ firmware development
-→ cross-compilation
-→ flashing
-→ hardware testing
-→ debugging
-→ iteration
+hardware wiring
+-> peripheral configuration
+-> embedded C development
+-> cross-compilation
+-> flashing
+-> serial diagnostics
+-> hardware testing
+-> debugging
+-> iteration
 ```
 
-It also provided a foundation for further work in embedded software, firmware, robotics, automotive systems and low-level software engineering.
+It also gave me a practical introduction to firmware architecture and a foundation for further work in embedded software, low-level systems, robotics and other hardware-focused software engineering areas.
